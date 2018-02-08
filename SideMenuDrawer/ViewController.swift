@@ -99,14 +99,17 @@ extension ViewController
         //Observer to update Button Text to record
         NotificationCenter.default.addObserver(self, selector: #selector(performSelectedOperationFromSideMenu), name: NSNotification.Name(rawValue: "hideMenu"), object: nil)
         let gesture : UIPanGestureRecognizer = UIPanGestureRecognizer(target: self, action:#selector(ViewController.handlePanGesture(panGesture:)))
+        let gesture1 : UIPanGestureRecognizer = UIPanGestureRecognizer(target: self, action:#selector(ViewController.handlePanGestureOfBlurView(panGesture:)))
         let vv = AddSideMenuBaseView()
         let bv = addBlurEffectView()
         self.add(asChildViewController: sideMenuVCObject, baseView: vv)
         vv.addGestureRecognizer(gesture)
+        bv.addGestureRecognizer(gesture1)
         self.view.addSubview(vv)
         self.view.addSubview(bv)
         view.bringSubview(toFront: vv)
     }
+    
     
     //MARK: Add Blur Effect
     func addBlurEffectView() -> UIVisualEffectView
@@ -116,6 +119,64 @@ extension ViewController
         blurView.frame = view.bounds
         blurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         return blurView
+    }
+    
+    //MARK: Pan gesture handler for Blur View
+    @objc func handlePanGestureOfBlurView(panGesture: UIPanGestureRecognizer)
+    {
+        ///In this pan is added to Blu View
+        ///We will only Modify BaseView as its main View
+        ///Get the changes
+        let translation = panGesture.translation(in: self.view)
+
+        ///Make View move to left side of Frame
+        if CGFloat(round(Double((panGesture.view?.frame.origin.x)!))) <= 0
+        {
+            self.baseView.center = CGPoint(x: self.baseView.center.x + translation.x, y: self.baseView.center.y)
+            panGesture.setTranslation(CGPoint.zero, in: self.view)
+        }
+        
+        ///Do not let View go beyond origin as 0
+        if CGFloat(round(Double((self.baseView.frame.origin.x)))) > 0
+        {
+            panGesture.view?.frame.origin.x = 0
+            self.baseView.frame.origin.x = 0
+            panGesture.setTranslation(CGPoint.zero, in: self.view)
+        }
+        
+        switch panGesture.state {
+        case .changed:
+            self.setAlphaOfBlurView(origin: (self.baseView.frame.maxX))
+            break
+        case .ended:
+            if CGFloat(round(Double((self.baseView.frame.maxX)))) >= self.view.frame.size.width*0.35
+            {
+                UIView.animate(withDuration: 0.7, animations: {
+                    self.baseView.frame.origin.x = 0
+                    panGesture.setTranslation(CGPoint.zero, in: self.view)
+                })
+            }
+            else
+            {
+                UIView.animate(withDuration: 0.4, animations: {
+                    self.baseView.frame.origin.x -= self.maximum_x
+                    panGesture.setTranslation(CGPoint.zero, in: self.view)
+                }, completion: { (success) in
+                    if (success)
+                    {
+                        self.remove(asChildViewController: self.sideMenuVCObject, baseView: self.baseView)
+                        self.baseView.removeFromSuperview()
+                        self.blurView.removeFromSuperview()
+                        
+                        //Remove Notification observer
+                        NotificationCenter.default.removeObserver(self,name: NSNotification.Name(rawValue: "hideMenu"),object: nil)
+                    }
+                })
+            }
+            break
+        default:
+            print("Default Case")
+        }
     }
     
     //MARK: Pan gesture Handler
